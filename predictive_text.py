@@ -1,20 +1,19 @@
 import re
-from itertools import chain
-
 import pandas as pd
-
-from nltk.tokenize import sent_tokenize, word_tokenize
-
-from gensim.models import Word2Vec
 import gensim.downloader as api
 
-from sklearn.ensemble import RandomForestClassifier
+
+from itertools import chain
+from nltk.tokenize import sent_tokenize, word_tokenize
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from gensim.models import Word2Vec
+
 
 def clean_text(text):
     text = text.lower()
 
-    #removing punctuation except for ./!/?
+    # removing punctuation except for ./!/?
     text = re.sub('[^\w\s.!?]', '', text)
 
     return(text)
@@ -33,16 +32,17 @@ text = open("book.txt")
 text = text.read()
 text = clean_text(text)
 
-#convert data into nested list of sentences which are lists of words
+# convert data into nested list of sentences which are lists of words
 data = [word_tokenize(sentence) for sentence in sent_tokenize(text)]
 
-#setup df
-df = pd.DataFrame(columns=['input', 'vectors', 'output'])
+# setup df
+df = pd.DataFrame(columns=['input', 'output'])
 
-#load vectors
+# load vectors
 model = api.load("glove-twitter-25")
 
-#populate df
+# populate df and vectors list
+vectors_list = []
 for sentence in data:
     n = 0
     while n < len(sentence) - 3:
@@ -53,27 +53,34 @@ for sentence in data:
         vectors = retrieve_vectors(in_words, model)
 
         if vectors:
-            #conglomerate vectors into single list
+        		# conglomerate vectors into single list
             vectors = [vector.tolist() for vector in vectors]
             vectors = list(chain.from_iterable(vectors))        
 
-        
-            df = df.append({'input': in_words, 'vectors': vectors,  'output': out_word}, ignore_index=True)
+            vectors_list.append(vectors)	
+            df = df.append({'input': in_words, 'output': out_word}, ignore_index=True)
 
-#sample data
+#add vectors to df
+vectors_df = pd.DataFrame(vectors_list)
+vectors_df.index = df.index
+df = pd.concat([df, vectors_df], axis=1)
+
 df = df.sample(n=2000)
 
-#split data into train and test - including 'input' in x so it can be connected w/ output
-x_train, x_test, y_train, y_test = train_test_split(df[['input', 'vectors']], df['output'], test_size = 0.2)
+# split data into train and test - including 'input' in x so it can be connected w/ output
+columns = [c for c in df.columns if c != 'output']
 
-#random forest classifier
+x_train, x_test, y_train, y_test = train_test_split(df[columns], df['output'], test_size = 0.2)
+
+# random forest classifier
+columns = [c for c in columns if c != 'input']
 
 rf = RandomForestClassifier(n_estimators = 100)
-rf.fit(pd.DataFrame(x_train["vectors"].tolist()), y_train)
+rf.fit(x_train[columns], y_train)
 
-predictions = rf.predict(pd.DataFrame(x_test["vectors"].tolist()))
+predictions = rf.predict(x_test[columns])
 
-#compare prediction and actual
+# compare prediction and actual
 matches = 0
 for in_words, prediction, actual in zip(x_test['input'], predictions, y_test):
     print(in_words, "\t\tprediction:", prediction, "\t\tactual:", actual)
