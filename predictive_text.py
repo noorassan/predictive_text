@@ -1,13 +1,15 @@
-from IPython import embed
-
 import re
+from itertools import chain
+
 import pandas as pd
 
-from random import sample
+from nltk.tokenize import sent_tokenize, word_tokenize
+
+from gensim.models import Word2Vec
+import gensim.downloader as api
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from gensim.models import Word2Vec
-from nltk.tokenize import sent_tokenize, word_tokenize
 
 def clean_text(text):
     text = text.lower()
@@ -17,47 +19,59 @@ def clean_text(text):
 
     return(text)
 
+def retrieve_vectors(words, model):
+    vectors = []
+    for word in words:
+        try:
+            vectors.append(model[word])
+        except KeyError:
+            return
+
+    return vectors
 
 text = open("book.txt")
 text = text.read()
 text = clean_text(text)
 
 #convert data into nested list of sentences which are lists of words
-data = [word_tokenize(sentence) for  sentence in sent_tokenize(text)]
+data = [word_tokenize(sentence) for sentence in sent_tokenize(text)]
 
 #setup df
-df = pd.DataFrame(columns=['input', 'output'])
+df = pd.DataFrame(columns=['input', 'vectors', 'output'])
+
+#load vectors
+model = api.load("glove-twitter-25")
 
 #populate df
 for sentence in data:
-   n = 0
-   while n < len(sentence) - 3:
-	in_words = " ".join(sentence[n:n+3])
-	out_word = sentence[n+3]
-	n += 1	
+    n = 0
+    while n < len(sentence) - 3:
+        in_words = sentence[n:n+3]
+        out_word = sentence[n+3]
+        n += 1
 
-	df = df.append({'input': in_words, 'output': out_word}, ignore_index=True)
+        vectors = retrieve_vectors(in_words, model)
 
-#sample
-df = df.sample(n=5000)
+        if vectors:
+            #conglomerate vectors into single list
+            vectors = [vector.tolist() for vector in vectors]
+            vectors = list(chain.from_iterable(vectors))        
 
-#vectorize
-word2vec = Word2Vec(data)
-embed()
+        
+            df = df.append({'input': in_words, 'vectors': vectors,  'output': out_word}, ignore_index=True)
 
+#sample data
+df = df.sample(n=2000)
 
 #split data into train and test - including 'input' in x so it can be connected w/ output
-columns = [c for c in df.columns if c != 'output']
-
-x_train, x_test, y_train, y_test = train_test_split(df[columns], df['output'], test_size = 0.2)
+x_train, x_test, y_train, y_test = train_test_split(df[['input', 'vectors']], df['output'], test_size = 0.2)
 
 #random forest classifier
-columns = [c for c in x_train.columns if c != 'input']
 
 rf = RandomForestClassifier(n_estimators = 100)
-rf.fit(x_train[columns], y_train)
+rf.fit(pd.DataFrame(x_train["vectors"].tolist()), y_train)
 
-predictions = rf.predict(x_test[columns])
+predictions = rf.predict(pd.DataFrame(x_test["vectors"].tolist()))
 
 #compare prediction and actual
 matches = 0
