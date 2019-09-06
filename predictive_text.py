@@ -1,6 +1,7 @@
 import re
 import pandas as pd
 import gensim.downloader as api
+import numpy as np
 
 
 from itertools import chain
@@ -26,7 +27,18 @@ def retrieve_vectors(words, model):
         except KeyError:
             return
 
+		# conglomerate vectors into single one-dimensional list
+    vectors = [vector.tolist() for vector in vectors]
+    vectors = list(chain.from_iterable(vectors))        
+
     return vectors
+
+def next_word(in_words, rf, model):
+		vectors = retrieve_vectors(in_words, model)
+		vectors = np.array(vectors)
+		
+		return rf.predict(vectors.reshape(1, -1))[0]
+		
 
 text = open("book.txt")
 text = text.read()
@@ -53,10 +65,6 @@ for sentence in data:
         vectors = retrieve_vectors(in_words, model)
 
         if vectors:
-        		# conglomerate vectors into single list
-            vectors = [vector.tolist() for vector in vectors]
-            vectors = list(chain.from_iterable(vectors))        
-
             vectors_list.append(vectors)	
             df = df.append({'input': in_words, 'output': out_word}, ignore_index=True)
 
@@ -85,7 +93,15 @@ matches = 0
 for in_words, prediction, actual in zip(x_test['input'], predictions, y_test):
     print(in_words, "\t\tprediction:", prediction, "\t\tactual:", actual)
     if prediction == actual:
-        matches += 1
+    		matches += 1
 
 print("matches:", matches)
 print(len(predictions))
+
+# generate text
+seeds = [["then", "i", "went"], ["i", "told", "mr."], ["did", "you", "ever"]]
+
+predictions = [next_word(seed, rf, model) for seed in seeds]
+
+for in_words, prediction in zip(seeds, predictions):
+		print(" ".join(in_words), prediction)
