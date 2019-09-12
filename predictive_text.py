@@ -19,11 +19,11 @@ def clean_text(text):
 
     return(text)
 
-def retrieve_vectors(words, model):
+def retrieve_vectors(words, word2vec):
     vectors = []
     for word in words:
         try:
-            vectors.append(model[word])
+            vectors.append(word2vec[word])
         except KeyError:
             return
 
@@ -33,11 +33,24 @@ def retrieve_vectors(words, model):
 
     return vectors
 
-def next_word(in_words, rf, model):
-		vectors = retrieve_vectors(in_words, model)
+def next_word(in_words, rf, word2vec):
+		vectors = retrieve_vectors(in_words, word2vec)
 		vectors = np.array(vectors)
 		
 		return rf.predict(vectors.reshape(1, -1))[0]
+		
+def next_n_words(phrase, rf, word2vec, n):
+		if n == 0:
+			return phrase
+
+		print("pre append", phrase)
+
+		in_words = phrase[-3:]
+		phrase.append(next_word(in_words, rf, word2vec))
+
+		print("post append", phrase)
+
+		return next_n_words(phrase, rf, word2vec, n-1)
 		
 
 text = open("book.txt")
@@ -51,7 +64,7 @@ data = [word_tokenize(sentence) for sentence in sent_tokenize(text)]
 df = pd.DataFrame(columns=['input', 'output'])
 
 # load vectors
-model = api.load("glove-twitter-25")
+word2vec = api.load("glove-twitter-25")
 
 # populate df and vectors list
 vectors_list = []
@@ -62,7 +75,7 @@ for sentence in data:
         out_word = sentence[n+3]
         n += 1
 
-        vectors = retrieve_vectors(in_words, model)
+        vectors = retrieve_vectors(in_words, word2vec)
 
         if vectors:
             vectors_list.append(vectors)	
@@ -101,7 +114,5 @@ print(len(predictions))
 # generate text
 seeds = [["then", "i", "went"], ["i", "told", "mr."], ["did", "you", "ever"]]
 
-predictions = [next_word(seed, rf, model) for seed in seeds]
-
-for in_words, prediction in zip(seeds, predictions):
-		print(" ".join(in_words), prediction)
+phrases = [next_n_words(seed, rf, word2vec, 4) for seed in seeds]
+print(phrases)
