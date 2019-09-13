@@ -35,20 +35,19 @@ def retrieve_vectors(words, word2vec):
 
 def next_word(in_words, rf, word2vec):
 		vectors = retrieve_vectors(in_words, word2vec)
-		vectors = np.array(vectors)
-		
-		return rf.predict(vectors.reshape(1, -1))[0]
+
+		if vectors:
+			vectors = np.array(vectors)
+			return rf.predict(vectors.reshape(1, -1))[0]
+		else:
+			return "<failed>"
 		
 def next_n_words(phrase, rf, word2vec, n):
 		if n == 0:
 			return phrase
 
-		print("pre append", phrase)
-
 		in_words = phrase[-3:]
 		phrase.append(next_word(in_words, rf, word2vec))
-
-		print("post append", phrase)
 
 		return next_n_words(phrase, rf, word2vec, n-1)
 		
