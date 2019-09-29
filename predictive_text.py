@@ -27,29 +27,29 @@ def retrieve_vectors(words, word2vec):
         except KeyError:
             return
 
-		# conglomerate vectors into single one-dimensional list
+    # conglomerate vectors into single one-dimensional list
     vectors = [vector.tolist() for vector in vectors]
     vectors = list(chain.from_iterable(vectors))        
 
     return vectors
 
 def next_word(in_words, rf, word2vec):
-		vectors = retrieve_vectors(in_words, word2vec)
+    vectors = retrieve_vectors(in_words, word2vec)
 
-		if vectors:
-			vectors = np.array(vectors)
-			return rf.predict(vectors.reshape(1, -1))[0]
-		else:
-			return "<failed>"
+    if vectors:
+        vectors = np.array(vectors)
+        return rf.predict(vectors.reshape(1, -1))[0]
+    else:
+        return "<failed>"
 		
 def next_n_words(phrase, rf, word2vec, n):
-		if n == 0:
-			return phrase
+    if n == 0:
+        return phrase
 
-		in_words = phrase[-3:]
-		phrase.append(next_word(in_words, rf, word2vec))
+    in_words = phrase[-3:]
+    phrase.append(next_word(in_words, rf, word2vec))
 
-		return next_n_words(phrase, rf, word2vec, n-1)
+    return next_n_words(phrase, rf, word2vec, n-1)
 		
 
 text = open("book.txt")
